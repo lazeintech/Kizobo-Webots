@@ -12,6 +12,7 @@ using namespace webots;
 
 #include <iostream>
 #include <fstream>
+#include <thread>
 using namespace std;
 
 #ifdef WINDOWS
@@ -21,6 +22,12 @@ using namespace std;
 #include <sys/types.h>
 #endif
 
+
+void runChildProcess() {
+    const char *args[] = {"./blocklyServer/blocklyServer", nullptr};  // Use const char* here
+    execvp(args[0], const_cast<char* const*>(args));  // Cast to char* const* as execvp expects
+    std::cerr << "Error executing command" << std::endl;  // Error handling if execvp fails
+}
 // This is the main program of your controller.
 // It creates an instance of your Robot instance, launches its
 // function(s) and destroys it at the end of the execution.
@@ -51,25 +58,34 @@ STARTUPINFO si;
     return 0;
 
 #else
-  pid_t pid;
-  pid = fork();
+  // pid_t pid;
+  // pid = fork();
   
-  if(pid < 0) {
-    cout << "Fork failed" << endl;
-  }
-  else if (pid == 0) {
+  // if(pid < 0) {
+    // cout << "Fork failed" << endl;
+  // }
+  // else if (pid == 0) {
   
-    char *args[] = {"./blocklyServer/blocklyServer", NULL};
-    execvp(args[0], args);
-    return 0;
-  }
+    // char *args[] = {"./blocklyServer/blocklyServer", NULL};
+    // execvp(args[0], args);
+    // return 0;
+  // }
+    try {
+        // Create a thread to run the child process
+        std::thread childThread(runChildProcess);
+        childThread.join(); // Wait for the child process to finish
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Failed to create thread: " << e.what() << std::endl;
+        return 0;
+    }
 #endif
   
   // create the Robot instance.
   Supervisor *supervisor = new Supervisor();
 
   Node *robot = supervisor->getFromDef("ROBOT");
-  Field *controller = robot->getField("controller");
+  // Field *controller = robot->getField("controller");
   // get the time step of the current world.
   int timeStep = (int)supervisor->getBasicTimeStep();
 
@@ -86,6 +102,7 @@ STARTUPINFO si;
 
 
     string message = supervisor->wwiReceiveText();
+    supervisor->wwiSendText("okkkkkkkkk");
     if(message.length() != 0) {
       cout << message << endl;
       
