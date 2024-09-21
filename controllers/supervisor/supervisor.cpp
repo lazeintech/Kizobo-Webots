@@ -20,13 +20,21 @@ using namespace std;
 #else
 #include <unistd.h>
 #include <sys/types.h>
+#include <process.h>
 #endif
 
+void runChildProcess()
+{
+  const char *exe = "./blocklyServer/blocklyServer.exe";
+  const char *args[] = {"blocklyServer.exe", nullptr}; // Program name must be the first argument
 
-void runChildProcess() {
-    const char *args[] = {"./blocklyServer/blocklyServer", nullptr};  // Use const char* here
-    execvp(args[0], const_cast<char* const*>(args));  // Cast to char* const* as execvp expects
-    std::cerr << "Error executing command" << std::endl;  // Error handling if execvp fails
+  // _P_NOWAIT to run the process asynchronously, or _P_WAIT to wait for it to finish
+  int ret = _spawnvp(_P_NOWAIT, exe, args);
+
+  if (ret == -1)
+  {
+    perror("spawnvp failed"); // Use perror to print the actual error message
+  }
 }
 // This is the main program of your controller.
 // It creates an instance of your Robot instance, launches its
@@ -35,52 +43,42 @@ void runChildProcess() {
 // a controller program.
 // The arguments of the main function can be specified by the
 // "controllerArgs" field of the Robot node
-int main(int argc, char **argv) {
-
+int main(int argc, char **argv)
+{
 #ifdef WINDOWS
+  STARTUPINFO si;
+  PROCESS_INFORMATION pi;
 
-STARTUPINFO si;
-    PROCESS_INFORMATION pi;
+  ZeroMemory(&si, sizeof(si));
+  si.cb = sizeof(si);
+  ZeroMemory(&pi, sizeof(pi));
 
-    ZeroMemory( &si, sizeof(si) );
-    si.cb = sizeof(si);
-    ZeroMemory( &pi, sizeof(pi) );
+  char *exe = "./blocklyServer/blocklyServer.exe";
+  if (!CreateProcess(NULL, exe, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+  {
+    cout << "Could not create process: " << GetLastError() << endl;
+    return 1;
+  }
 
-    char *exe =  "./blocklyServer/blocklyServer.exe";
-    if( !CreateProcess( NULL, exe, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi )) 
-    {
-        cout << "Could not create process: " << GetLastError() << endl;
-        return 1;
-    }
-
-    CloseHandle( pi.hProcess );
-    CloseHandle( pi.hThread );
-    return 0;
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+  return 0;
 
 #else
-  // pid_t pid;
-  // pid = fork();
-  
-  // if(pid < 0) {
-    // cout << "Fork failed" << endl;
-  // }
-  // else if (pid == 0) {
-  
-    // char *args[] = {"./blocklyServer/blocklyServer", NULL};
-    // execvp(args[0], args);
-    // return 0;
-  // }
-    try {
-        // Create a thread to run the child process
-        std::thread childThread(runChildProcess);
-        childThread.join(); // Wait for the child process to finish
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Failed to create thread: " << e.what() << std::endl;
-        return 0;
-    }
+  std::thread childThread;
+  try
+  {
+    // Create a thread to run the child process
+    childThread = std::thread(runChildProcess);
+    childThread.detach();
+  }
+  catch (const std::exception &e)
+  {
+    std::cerr << "Failed to create thread: " << e.what() << std::endl;
+    return 0;
+  }
 #endif
-  
+
   // create the Robot instance.
   Supervisor *supervisor = new Supervisor();
 
@@ -88,7 +86,6 @@ STARTUPINFO si;
   // Field *controller = robot->getField("controller");
   // get the time step of the current world.
   int timeStep = (int)supervisor->getBasicTimeStep();
-
 
   // You should insert a getDevice-like function in order to get the
   // instance of a device of the robot. Something like:
@@ -98,27 +95,27 @@ STARTUPINFO si;
 
   // Main loop:
   // - perform simulation steps until Webots is stopping the controller
-  while ((supervisor->step(timeStep)) != -1) {
-
-
+  while ((supervisor->step(timeStep)) != -1)
+  {
     string message = supervisor->wwiReceiveText();
-    supervisor->wwiSendText("okkkkkkkkk");
-    if(message.length() != 0) {
-      cout << message << endl;
-      
+    if (message.length() != 0)
+    {
+      supervisor->wwiSendText("okkkkkkkkk");
+      // cout << message << endl;
+
       ofstream out("../my_controller/my_controller.py");
-      
+
       out << message << endl;
 
       out.close();
-      
+
       supervisor->simulationReset();
       robot->restartController();
     }
   }
 
   // Enter here exit cleanup code.
-
+  childThread.join();
   delete supervisor;
   return 0;
 }

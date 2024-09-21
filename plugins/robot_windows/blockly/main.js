@@ -145,11 +145,14 @@ function convertCode() {
     ws.send(SocketCommand.SEND_CODE);
     ws.send(code);
 
+    // update and reset Sim
+    window.robotWindow.send(code);
+
     saveLast();
 }
 function realTimeUpdate() {
     var code = Blockly.Python.workspaceToCode(workspace);
-    document.getElementById('textCode').innerHTML = code;
+    // document.getElementById('textCode').innerHTML = code;
 }
 
 function saveBlocks() {
@@ -174,8 +177,7 @@ function restore() {
 }
 
 function receiveMessage(value) {
-
-    console.log(value);
+    // console.log(value);
 }
 
 function onResize(e) {
